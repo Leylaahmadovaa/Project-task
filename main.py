@@ -1,13 +1,11 @@
 import time
 import statistics
-import networkx as nx
 
 # =====================================================================
 # 1. N-QUEENS BACKTRACKING (Scanning, Used-Marks, Bitmasks)
 # =====================================================================
 
 def nqueens_scan(N):
-    """1. SCANNING: Əvvəlki təyinatları tək-tək skan edir (O(N) check)."""
     solutions = 0
     nodes_visited = 0
 
@@ -35,7 +33,6 @@ def nqueens_scan(N):
 
 
 def nqueens_used_marks(N):
-    """2. USED-MARKS: Sütun və diaqonalları Set/Array ilə izləyir (O(1) check)."""
     solutions = 0
     nodes_visited = 0
     cols = [False] * N
@@ -62,7 +59,6 @@ def nqueens_used_marks(N):
 
 
 def nqueens_bitmask(N):
-    """3. BITMASKS: Bit əməliyyatları ilə tam optimallaşdırılmış yoxlama."""
     solutions = 0
     nodes_visited = 0
     FULL_MASK = (1 << N) - 1
@@ -93,7 +89,6 @@ def nqueens_bitmask(N):
 # =====================================================================
 
 def graph_coloring_scan(adj_matrix, K):
-    """1. SCANNING: Qonşuları tək-tək skan edərək rəng konfliktini yoxlayır."""
     V = len(adj_matrix)
     colors = [-1] * V
     nodes_visited = 0
@@ -122,10 +117,8 @@ def graph_coloring_scan(adj_matrix, K):
 
 
 def graph_coloring_used_marks(adj_matrix, K):
-    """2. USED-MARKS: Hər təpə üçün istifadə olunmuş rəngləri Set ilə saxlayır."""
     V = len(adj_matrix)
     colors = [-1] * V
-    neighbor_colors = [set() for _ in range(V)]
     nodes_visited = 0
 
     def backtrack(v):
@@ -135,22 +128,17 @@ def graph_coloring_used_marks(adj_matrix, K):
             return True
 
         for c in range(K):
-            if c not in neighbor_colors[v]:
+            # Qonşularda bu rəngin olub- olmadığını birbaşa yoxlayırıq
+            conflict = False
+            for u in range(V):
+                if adj_matrix[v][u] and colors[u] == c:
+                    conflict = True
+                    break
+            if not conflict:
                 colors[v] = c
-                added_neighbors = []
-                for u in range(V):
-                    if adj_matrix[v][u]:
-                        if c not in neighbor_colors[u]:
-                            neighbor_colors[u].add(c)
-                            added_neighbors.append(u)
-
                 if backtrack(v + 1):
                     return True
-
                 colors[v] = -1
-                for u in added_neighbors:
-                    neighbor_colors[u].remove(c)
-
         return False
 
     success = backtrack(0)
@@ -158,10 +146,8 @@ def graph_coloring_used_marks(adj_matrix, K):
 
 
 def graph_coloring_bitmask(adj_matrix, K):
-    """3. BITMASKS: Qonşu rəngləri bitmask (1 << color) ilə izləyir."""
     V = len(adj_matrix)
     colors = [-1] * V
-    neighbor_masks = [0] * V
     nodes_visited = 0
 
     def backtrack(v):
@@ -170,22 +156,18 @@ def graph_coloring_bitmask(adj_matrix, K):
         if v == V:
             return True
 
-        for c in range(K):
-            color_bit = 1 << c
-            if not (neighbor_masks[v] & color_bit):
-                colors[v] = c
-                updated_neighbors = []
-                for u in range(V):
-                    if adj_matrix[v][u] and not (neighbor_masks[u] & color_bit):
-                        neighbor_masks[u] |= color_bit
-                        updated_neighbors.append(u)
+        # Qonşu rənglərini bitmask kimi toplayırıq
+        forbidden_mask = 0
+        for u in range(V):
+            if adj_matrix[v][u] and colors[u] != -1:
+                forbidden_mask |= (1 << colors[u])
 
+        for c in range(K):
+            if not (forbidden_mask & (1 << c)):
+                colors[v] = c
                 if backtrack(v + 1):
                     return True
-
                 colors[v] = -1
-                for u in updated_neighbors:
-                    neighbor_masks[u] &= ~color_bit
 
         return False
 
@@ -194,15 +176,33 @@ def graph_coloring_bitmask(adj_matrix, K):
 
 
 # =====================================================================
-# 3. VERİFİKASİYA (CORRECTNESS ORACLES / VALIDATORS)
+# 3. MTRX READER & ORACLES (Validator)
 # =====================================================================
 
-N_QUEENS_KNOWN_SOLUTIONS = {
-    4: 2, 5: 10, 6: 4, 7: 40, 8: 92, 9: 352, 10: 724
-}
+def load_mtx_graph(filename):
+    edges = []
+    with open(filename, 'r') as f:
+        for line in f:
+            if line.startswith('%') or not line.strip():
+                continue
+            parts = line.strip().split()
+            if len(parts) == 3:
+                continue
+            if len(parts) >= 2:
+                u, v = int(parts[0]) - 1, int(parts[1]) - 1
+                edges.append((u, v))
+
+    V = max(max(u, v) for u, v in edges) + 1
+    adj_matrix = [[0] * V for _ in range(V)]
+    for u, v in edges:
+        adj_matrix[u][v] = 1
+        adj_matrix[v][u] = 1
+    return adj_matrix
+
+
+N_QUEENS_KNOWN_SOLUTIONS = {4: 2, 5: 10, 6: 4, 7: 40, 8: 92, 9: 352, 10: 724}
 
 def validate_graph_coloring(adj_matrix, colors):
-    """Qrafın k-rənglənməsinin düzgünlüyünü yoxlayan müstəqil orakul."""
     if colors is None:
         return True
     V = len(adj_matrix)
@@ -214,77 +214,46 @@ def validate_graph_coloring(adj_matrix, colors):
 
 
 # =====================================================================
-# 4. BENÇMARK VƏ EXPERIMENTAL PROTOCOL (Timing Rigour)
+# 4. BENCHMARK PROTOCOL (Warm-up + Median Timing)
 # =====================================================================
 
 def benchmark_function(func, *args, runs=7):
-    """1 untimed warm-up + repeated timed runs -> Median Time."""
-    _ = func(*args)
-
+    _ = func(*args)  # 1 warm-up run (ölçülmür)
     times = []
     last_res = None
     for _ in range(runs):
         start = time.perf_counter()
         last_res = func(*args)
         end = time.perf_counter()
-        times.append((end - start) * 1000)  # ms
-
-    median_time = statistics.median(times)
-    return last_res, median_time
+        times.append((end - start) * 1000)
+    return last_res, statistics.median(times)
 
 
 # =====================================================================
-# 5. İCRA VƏ NƏTİCƏLƏR (GOOGLE COLAB)
+# 5. İCRA VƏ NƏTİCƏLƏRİN ÇAPI
 # =====================================================================
 
 if __name__ == "__main__":
-    print("=" * 60)
+    print("=" * 70)
     print("PART 1: N-QUEENS BENCHMARK (N=8)")
-    print("=" * 60)
+    print("=" * 70)
     N = 8
     expected = N_QUEENS_KNOWN_SOLUTIONS[N]
 
-    methods_nq = [
-        ("Scanning", nqueens_scan),
-        ("Used-marks", nqueens_used_marks),
-        ("Bitmasks", nqueens_bitmask)
-    ]
-
-    for name, fn in methods_nq:
+    for name, fn in [("Scanning", nqueens_scan), ("Used-marks", nqueens_used_marks), ("Bitmasks", nqueens_bitmask)]:
         (sols, nodes), med_t = benchmark_function(fn, N)
         valid = (sols == expected)
-        time_per_node = (med_t / nodes) * 1000 if nodes > 0 else 0
-        print(f"[{name:10s}] Həll: {sols} | Ziyarət: {nodes:6d} | "
-              f"Median Vaxt: {med_t:6.3f} ms | Qovşaq başı: {time_per_node:5.3f} µs | Orakul: {valid}")
+        print(f"[{name:10s}] Həll: {sols} | Qovşaq: {nodes:6d} | Median Vaxt: {med_t:6.3f} ms | Düzgün: {valid}")
 
-    print("\n" + "=" * 60)
-    print("PART 2: REAL GRAPH k-COLORING (Dolphins Dataset - dolphins.gml)")
-    print("=" * 60)
+    print("\n" + "=" * 70)
+    print("PART 2: REAL GRAPH k-COLORING (Zachary's Karate Club)")
+    print("=" * 70)
     
-    # Google Colab-dakı dolphins.gml faylını oxuyuruq
-    try:
-        G = nx.read_gml("dolphins.gml")
-        # Gml fayllarında bəzən node adları string ola bilər, onları integer indeksə keçiririk
-        G = nx.convert_node_labels_to_integers(G)
-        adj_matrix = nx.to_numpy_array(G, dtype=int).tolist()
-        V = len(adj_matrix)
-        K = 4  # Dolphins qrafı üçün 4 rəng testi (və ya 5)
+    adj_matrix = load_mtx_graph("soc-karate.mtx")
+    V = len(adj_matrix)
+    K = 5  # Karate qrafı üçün optimal rəng sayı
 
-        print(f"Dataset uğurla oxundu! Təpə nöqtəsi (V): {V} | Tillər (E): {G.number_of_edges()}")
-
-        methods_gc = [
-            ("Scanning", graph_coloring_scan),
-            ("Used-marks", graph_coloring_used_marks),
-            ("Bitmasks", graph_coloring_bitmask)
-        ]
-
-        for name, fn in methods_gc:
-            (success, colors, nodes), med_t = benchmark_function(fn, adj_matrix, K)
-            valid = validate_graph_coloring(adj_matrix, colors)
-            time_per_node = (med_t / nodes) * 1000 if nodes > 0 else 0
-            print(f"[{name:10s}] Tapıldı: {str(success):5s} | Ziyarət: {nodes:6d} | "
-                  f"Median Vaxt: {med_t:6.3f} ms | Qovşaq başı: {time_per_node:5.3f} µs | Orakul: {valid}")
-
-    except FileNotFoundError:
-        print("XƏTA: 'dolphins.gml' faylı tapılmadı!")
-        print("Zəhmət olmasa sol paneldən (Files bölməsindən) faylı Colab-a yüklədiyinizə əmin olun.")
+    for name, fn in [("Scanning", graph_coloring_scan), ("Used-marks", graph_coloring_used_marks), ("Bitmasks", graph_coloring_bitmask)]:
+        (success, colors, nodes), med_t = benchmark_function(fn, adj_matrix, K)
+        valid = validate_graph_coloring(adj_matrix, colors)
+        print(f"[{name:10s}] Tapıldı: {str(success):5s} | Qovşaq: {nodes:6d} | Median Vaxt: {med_t:6.3f} ms | Düzgün: {valid}")
