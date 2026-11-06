@@ -127,14 +127,14 @@ def graph_coloring_used_marks(adj_matrix, K):
         if v == V:
             return True
 
+        # Qonşuların hansı rənglərdən istifadə etdiyini qeyd edirik (Used-marks)
+        used_colors = [False] * K
+        for u in range(V):
+            if adj_matrix[v][u] and colors[u] != -1:
+                used_colors[colors[u]] = True
+
         for c in range(K):
-            # Qonşularda bu rəngin olub- olmadığını birbaşa yoxlayırıq
-            conflict = False
-            for u in range(V):
-                if adj_matrix[v][u] and colors[u] == c:
-                    conflict = True
-                    break
-            if not conflict:
+            if not used_colors[c]:
                 colors[v] = c
                 if backtrack(v + 1):
                     return True
@@ -248,7 +248,7 @@ if __name__ == "__main__":
     print("\n" + "=" * 70)
     print("PART 2: REAL GRAPH k-COLORING (Zachary's Karate Club)")
     print("=" * 70)
-    
+
     adj_matrix = load_mtx_graph("soc-karate.mtx")
     V = len(adj_matrix)
     K = 5  # Karate qrafı üçün optimal rəng sayı
