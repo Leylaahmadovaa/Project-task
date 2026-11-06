@@ -243,17 +243,17 @@ if __name__ == "__main__":
     for name, fn in [("Scanning", nqueens_scan), ("Used-marks", nqueens_used_marks), ("Bitmasks", nqueens_bitmask)]:
         (sols, nodes), med_t = benchmark_function(fn, N)
         valid = (sols == expected)
-        print(f"[{name:10s}] Həll: {sols} | Qovşaq: {nodes:6d} | Median Vaxt: {med_t:6.3f} ms | Düzgün: {valid}")
+        print(f"[{name:10s}] Solutions: {sols} | Nodes: {nodes:6d} | Median Time: {med_t:6.3f} ms | Correct: {valid}")
 
     print("\n" + "=" * 70)
     print("PART 2: REAL GRAPH k-COLORING (Zachary's Karate Club)")
     print("=" * 70)
-
+    
     adj_matrix = load_mtx_graph("soc-karate.mtx")
     V = len(adj_matrix)
-    K = 5  # Karate qrafı üçün optimal rəng sayı
+    K = 5  # Optimal color count for Karate graph
 
     for name, fn in [("Scanning", graph_coloring_scan), ("Used-marks", graph_coloring_used_marks), ("Bitmasks", graph_coloring_bitmask)]:
         (success, colors, nodes), med_t = benchmark_function(fn, adj_matrix, K)
         valid = validate_graph_coloring(adj_matrix, colors)
-        print(f"[{name:10s}] Tapıldı: {str(success):5s} | Qovşaq: {nodes:6d} | Median Vaxt: {med_t:6.3f} ms | Düzgün: {valid}")
+        print(f"[{name:10s}] Found: {str(success):5s} | Nodes: {nodes:6d} | Median Time: {med_t:6.3f} ms | Correct: {valid}")
